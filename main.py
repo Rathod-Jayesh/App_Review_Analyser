@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -11,6 +12,7 @@ from src.phase3.api import router as phase3_router
 from src.phase4.api import router as phase4_router
 
 STATIC_DIR = Path(__file__).parent / "static"
+IS_DOCKER = bool(os.environ.get("DOCKER"))
 
 app = FastAPI(
     title="GROWW App Review Analyser",
@@ -31,9 +33,9 @@ app.include_router(phase2_router)
 app.include_router(phase3_router)
 app.include_router(phase4_router)
 
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+if not IS_DOCKER and STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-
-@app.get("/")
-def serve_frontend():
-    return FileResponse(str(STATIC_DIR / "index.html"))
+    @app.get("/")
+    def serve_frontend():
+        return FileResponse(str(STATIC_DIR / "index.html"))

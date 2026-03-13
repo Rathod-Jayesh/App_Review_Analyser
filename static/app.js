@@ -1,4 +1,4 @@
-const API = "";
+const API = window.__API_BASE__ || "";
 
 async function api(method, path, body = null) {
   const opts = { method, headers: { "Content-Type": "application/json" } };
@@ -280,7 +280,7 @@ function appData() {
     downloadPdf() {
       const date = this.latestPulse && this.latestPulse.report_date;
       if (!date) return this.notify("No pulse note available. Generate one first.", "error");
-      window.open(`/api/weekly-note/download-pdf/${date}`, "_blank");
+      window.open(`${API}/api/weekly-note/download-pdf/${date}`, "_blank");
     },
 
     async handleRunAll() {
