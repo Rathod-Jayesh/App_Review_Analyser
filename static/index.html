@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GROWW Review Pulse</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <script src="/static/app.js"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: {
+        groww:  { DEFAULT: '#00d09c', dark: '#00b386', light: '#e6faf5', lighter: '#f0fdf8' },
+      }}}
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .spinner { border: 3px solid #e5e7eb; border-top: 3px solid #00d09c; border-radius: 50%; width: 18px; height: 18px; animation: spin 0.7s linear infinite; display: inline-block; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    .rating-bar { height: 8px; border-radius: 4px; transition: width 0.6s ease; }
+    .pulse-content h1 { font-size: 1.35rem; font-weight: 700; color: #00b386; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e6faf5; }
+    .pulse-content h2 { font-size: 1.1rem; font-weight: 600; color: #1f2937; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+    .pulse-content h3 { font-size: 1rem; font-weight: 600; color: #374151; margin-top: 1rem; margin-bottom: 0.4rem; }
+    .pulse-content p { margin-bottom: 0.5rem; line-height: 1.7; color: #4b5563; }
+    .pulse-content blockquote { border-left: 3px solid #00d09c; padding: 0.6rem 1rem; background: #f0fdf8; font-style: italic; margin: 0.75rem 0; border-radius: 0 6px 6px 0; color: #374151; }
+    .pulse-content ul, .pulse-content ol { padding-left: 1.5rem; margin-bottom: 0.75rem; }
+    .pulse-content li { margin-bottom: 0.4rem; color: #4b5563; line-height: 1.6; }
+    .pulse-content strong { color: #1f2937; }
+    @media print { nav, footer, .no-print { display: none !important; } main { padding: 0 !important; max-width: 100% !important; } }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen" x-data="appData()" x-init="init()" x-cloak>
+
+  <!-- Toast -->
+  <div x-show="toast.show" x-transition.opacity.duration.300ms
+       :class="toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-500'"
+       class="fixed top-5 right-5 z-[100] text-white px-5 py-3 rounded-xl shadow-2xl max-w-sm text-sm font-medium flex items-center gap-2">
+    <svg x-show="toast.type !== 'error'" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+    <svg x-show="toast.type === 'error'" class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+    <span x-text="toast.msg"></span>
+  </div>
+
+  <!-- Nav -->
+  <nav class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center gap-3 cursor-pointer" @click="navigateTo('dashboard')" tabindex="0" role="button" aria-label="Go to Dashboard">
+          <div class="w-9 h-9 bg-gradient-to-br from-groww to-groww-dark rounded-xl flex items-center justify-center shadow-sm">
+            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          </div>
+          <div>
+            <span class="font-bold text-gray-900 text-base leading-tight block">GROWW Review Pulse</span>
+            <span class="text-[10px] text-gray-400 leading-tight">App Review Analyser</span>
+          </div>
+        </div>
+        <div class="flex gap-1 bg-gray-100 p-1 rounded-xl">
+          <template x-for="[id, label] in [['dashboard','Dashboard'],['pipeline','Pipeline'],['pulse','Weekly Pulse']]">
+            <button @click="navigateTo(id)"
+                    :class="page === id ? 'bg-white text-gray-900 shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'"
+                    class="px-4 py-2 rounded-lg text-sm transition-all" x-text="label" :aria-label="label" tabindex="0">
+            </button>
+          </template>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- ===================== DASHBOARD ===================== -->
+    <section x-show="page === 'dashboard'" class="fade-in">
+      <div class="flex items-center justify-between mb-8">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p class="text-sm text-gray-500 mt-1" x-text="stats.lastFetched ? 'Last updated ' + timeAgo(stats.lastFetched) : 'No data yet'"></p>
+        </div>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+              <svg class="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+            </div>
+            <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold">Reviews</p>
+          </div>
+          <p class="text-3xl font-extrabold text-gray-900" x-text="stats.reviews.toLocaleString()"></p>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+              <svg class="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+            </div>
+            <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold">Avg Rating</p>
+          </div>
+          <p class="text-3xl font-extrabold text-gray-900"><span x-text="stats.avgRating"></span><span class="text-base font-normal text-gray-400">/5</span></p>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
+              <svg class="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+            </div>
+            <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold">Themes</p>
+          </div>
+          <p class="text-3xl font-extrabold text-gray-900" x-text="stats.themes"></p>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+              <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            </div>
+            <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold">Latest Pulse</p>
+          </div>
+          <p class="text-lg font-bold text-gray-900" x-text="stats.latestNote || 'None'"></p>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl p-6 mb-8 shadow-lg no-print">
+        <h2 class="text-white font-semibold text-base mb-4">Quick Actions</h2>
+        <div class="flex flex-wrap gap-3">
+          <button @click="navigateTo('pipeline')"
+                  class="bg-groww hover:bg-groww-dark text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-2"
+                  aria-label="Open Pipeline Wizard">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Run Full Pipeline
+          </button>
+          <button @click="navigateTo('pulse')"
+                  class="bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-all backdrop-blur flex items-center gap-2"
+                  aria-label="View Weekly Pulse">
+            View Weekly Pulse
+          </button>
+        </div>
+      </div>
+
+      <div class="grid lg:grid-cols-5 gap-6">
+        <!-- Left: Rating + Themes -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- Rating Distribution -->
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <h2 class="font-bold text-gray-900 text-base mb-5">Rating Distribution</h2>
+            <div class="space-y-3">
+              <template x-for="star in [5,4,3,2,1]" :key="star">
+                <div class="flex items-center gap-3">
+                  <span class="text-sm font-semibold text-gray-600 w-4" x-text="star"></span>
+                  <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                  <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div class="rating-bar bg-amber-400" :style="'width:' + ratingPct(star) + '%'"></div>
+                  </div>
+                  <span class="text-xs text-gray-400 w-16 text-right" x-text="(stats.ratingDist[String(star)] || 0) + ' (' + ratingPct(star) + '%)'"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Themes -->
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <h2 class="font-bold text-gray-900 text-base mb-5">Discovered Themes</h2>
+            <template x-if="themes.length === 0">
+              <div class="text-center py-6">
+                <p class="text-gray-400 text-sm">No themes yet. Run the pipeline to discover themes.</p>
+              </div>
+            </template>
+            <div class="space-y-3">
+              <template x-for="(theme, i) in themes" :key="theme.id">
+                <div class="p-4 rounded-xl border border-gray-100 hover:border-groww/30 hover:bg-groww-lighter transition-all">
+                  <div class="flex items-start gap-3">
+                    <span class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
+                          :class="['bg-red-50 text-red-600','bg-amber-50 text-amber-600','bg-blue-50 text-blue-600','bg-emerald-50 text-emerald-600','bg-purple-50 text-purple-600'][i % 5]"
+                          x-text="i + 1"></span>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2">
+                        <p class="font-semibold text-gray-900 text-sm" x-text="theme.name"></p>
+                        <span x-show="themeReviewCount(theme.id) > 0"
+                              class="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium"
+                              x-text="themeReviewCount(theme.id) + ' reviews'"></span>
+                      </div>
+                      <p class="text-gray-500 text-xs mt-1 leading-relaxed" x-text="theme.description"></p>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Pulse Preview -->
+        <div class="lg:col-span-3">
+          <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div class="flex items-center justify-between mb-5">
+              <h2 class="font-bold text-gray-900 text-base">Latest Pulse Preview</h2>
+              <button x-show="latestPulse" @click="navigateTo('pulse')"
+                      class="text-groww hover:text-groww-dark text-xs font-medium no-print" aria-label="View full pulse">
+                View full &rarr;
+              </button>
+            </div>
+            <template x-if="!latestPulse">
+              <div class="text-center py-12">
+                <p class="text-gray-400 text-sm">No pulse note generated yet. Run the pipeline first.</p>
+              </div>
+            </template>
+            <template x-if="latestPulse">
+              <div>
+                <div class="flex items-center gap-3 mb-4 pb-4 border-b border-gray-100">
+                  <span class="bg-groww-light text-groww-dark text-xs font-semibold px-3 py-1 rounded-full" x-text="latestPulse.report_date"></span>
+                  <span class="text-xs text-gray-400" x-text="latestPulse.period || ''"></span>
+                </div>
+                <div class="pulse-content text-sm max-h-[500px] overflow-y-auto pr-2" x-html="renderMd(latestPulse.markdown_content)"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== PIPELINE ===================== -->
+    <section x-show="page === 'pipeline'" class="fade-in">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">Pipeline Control Center</h1>
+          <p class="text-sm text-gray-500 mt-1">Configure, run the full pipeline, and get your weekly report.</p>
+        </div>
+      </div>
+
+      <!-- Config + Run All -->
+      <div class="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl p-6 mb-6 shadow-lg no-print">
+        <div class="grid sm:grid-cols-3 gap-4 mb-5">
+          <div>
+            <label class="text-xs text-gray-400 font-semibold uppercase tracking-wide block mb-1.5">Week Range</label>
+            <select x-model.number="fetchWeeks"
+                    class="w-full bg-white/10 text-white border border-white/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-groww"
+                    aria-label="Select week range">
+              <option value="8" class="text-gray-900">Last 8 weeks</option>
+              <option value="10" class="text-gray-900">Last 10 weeks</option>
+              <option value="12" class="text-gray-900">Last 12 weeks</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-gray-400 font-semibold uppercase tracking-wide block mb-1.5">Max Reviews</label>
+            <select x-model.number="maxReviews"
+                    class="w-full bg-white/10 text-white border border-white/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-groww"
+                    aria-label="Select max reviews">
+              <option value="500" class="text-gray-900">500 reviews</option>
+              <option value="1000" class="text-gray-900">1,000 reviews</option>
+              <option value="2000" class="text-gray-900">2,000 reviews</option>
+              <option value="3000" class="text-gray-900">3,000 reviews</option>
+            </select>
+          </div>
+          <div class="flex items-end">
+            <button @click="handleRunAll()"
+                    :disabled="pipelineRunning"
+                    class="w-full bg-groww hover:bg-groww-dark text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    aria-label="Run full pipeline">
+              <span x-show="pipelineRunning" class="spinner"></span>
+              <svg x-show="!pipelineRunning" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              <span x-text="pipelineRunning ? 'Running...' : 'Run Full Pipeline'"></span>
+            </button>
+          </div>
+        </div>
+        <p class="text-xs text-gray-400">Runs: Fetch Reviews &rarr; Discover Themes &rarr; Classify &rarr; Generate Weekly Note</p>
+      </div>
+
+      <!-- Stepper -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-6">
+        <div class="flex items-center justify-between">
+          <template x-for="(step, i) in [{l:'Fetch',d:'Reviews'},{l:'Discover',d:'Themes'},{l:'Classify',d:'Reviews'},{l:'Generate',d:'Note'},{l:'Email',d:'Send'}]" :key="i">
+            <div class="flex items-center flex-1">
+              <div class="flex flex-col items-center">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all"
+                     :class="i < pipelineStep ? 'bg-groww text-white' : i === pipelineStep ? 'bg-groww-light text-groww-dark ring-2 ring-groww ring-offset-2' : 'bg-gray-100 text-gray-400'">
+                  <svg x-show="i < pipelineStep" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                  <span x-show="i >= pipelineStep" x-text="i + 1"></span>
+                </div>
+                <p class="text-xs font-semibold mt-2" :class="i <= pipelineStep ? 'text-gray-900' : 'text-gray-400'" x-text="step.l"></p>
+                <p class="text-[10px]" :class="i <= pipelineStep ? 'text-gray-500' : 'text-gray-300'" x-text="step.d"></p>
+              </div>
+              <div x-show="i < 4" class="flex-1 h-0.5 mx-3 rounded-full" :class="i < pipelineStep ? 'bg-groww' : 'bg-gray-200'"></div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Pipeline Log -->
+      <div x-show="pipelineLog.length > 0" class="bg-gray-900 rounded-2xl p-5 mb-6 shadow-sm">
+        <h3 class="text-xs text-gray-400 uppercase tracking-widest font-semibold mb-3">Pipeline Log</h3>
+        <div class="space-y-1 max-h-40 overflow-y-auto font-mono text-xs">
+          <template x-for="(log, i) in pipelineLog" :key="i">
+            <div class="text-gray-300"><span class="text-gray-500" x-text="log.time"></span> <span x-text="log.msg"></span></div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Individual Step Cards (for manual runs) -->
+      <div class="space-y-4 mb-6">
+        <!-- Step 1: Fetch -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" :class="pipelineStep === 0 ? 'ring-2 ring-groww/20' : ''">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              </div>
+              <div>
+                <h3 class="font-bold text-gray-900">Step 1: Fetch Reviews</h3>
+                <p class="text-xs text-gray-500" x-text="'Scrape ' + fetchWeeks + ' weeks, max ' + maxReviews + ' reviews'"></p>
+              </div>
+            </div>
+            <button @click="handleFetchReviews()" :disabled="isLoading('fetch')"
+                    class="bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2">
+              <span x-show="isLoading('fetch')" class="spinner"></span>
+              <span x-text="isLoading('fetch') ? 'Fetching...' : 'Fetch'"></span>
+            </button>
+          </div>
+          <template x-if="pipelineResults.fetch">
+            <div class="mt-4 bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex items-center gap-3">
+              <svg class="w-5 h-5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span class="text-sm"><span class="font-semibold text-emerald-700" x-text="pipelineResults.fetch.total_count + ' reviews'"></span> <span class="text-emerald-600" x-text="'(' + pipelineResults.fetch.raw_fetched + ' raw, ' + pipelineResults.fetch.filtered_out + ' filtered)'"></span></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Step 2: Themes -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" :class="pipelineStep === 1 ? 'ring-2 ring-groww/20' : ''">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+              </div>
+              <div>
+                <h3 class="font-bold text-gray-900">Step 2: Discover Themes</h3>
+                <p class="text-xs text-gray-500">Use Groq LLM to discover up to 5 themes</p>
+              </div>
+            </div>
+            <button @click="handleGenerateThemes()" :disabled="isLoading('themes') || pipelineStep < 1"
+                    class="bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2">
+              <span x-show="isLoading('themes')" class="spinner"></span>
+              <span x-text="isLoading('themes') ? 'Generating...' : 'Discover'"></span>
+            </button>
+          </div>
+          <template x-if="pipelineResults.themes">
+            <div class="mt-4 bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+              <div class="flex items-center gap-2 mb-2">
+                <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span class="font-semibold text-emerald-700 text-sm" x-text="pipelineResults.themes.theme_count + ' themes discovered'"></span>
+              </div>
+              <div class="space-y-1 ml-7">
+                <template x-for="(t, i) in (pipelineResults.themes.themes || [])" :key="t.id">
+                  <p class="text-sm text-gray-700"><span class="font-semibold" x-text="(i+1) + '. ' + t.name"></span> <span class="text-gray-500" x-text="'— ' + t.description"></span></p>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Step 3: Classify -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" :class="pipelineStep === 2 ? 'ring-2 ring-groww/20' : ''">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+              </div>
+              <div>
+                <h3 class="font-bold text-gray-900">Step 3: Classify Reviews</h3>
+                <p class="text-xs text-gray-500">Assign each review to a theme (~5-12 min)</p>
+              </div>
+            </div>
+            <button @click="handleClassifyReviews()" :disabled="isLoading('classify') || pipelineStep < 2"
+                    class="bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2">
+              <span x-show="isLoading('classify')" class="spinner"></span>
+              <span x-text="isLoading('classify') ? 'Classifying...' : 'Classify'"></span>
+            </button>
+          </div>
+          <template x-if="pipelineResults.classify">
+            <div class="mt-4 bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex items-center gap-3">
+              <svg class="w-5 h-5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span class="font-semibold text-emerald-700 text-sm" x-text="pipelineResults.classify.total_classified + ' reviews classified'"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Step 4: Generate Note -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" :class="pipelineStep === 3 ? 'ring-2 ring-groww/20' : ''">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              </div>
+              <div>
+                <h3 class="font-bold text-gray-900">Step 4: Generate Weekly Note</h3>
+                <p class="text-xs text-gray-500">Gemini generates: Top themes, user quotes, action ideas</p>
+              </div>
+            </div>
+            <button @click="handleGenerateNote()" :disabled="isLoading('generate') || pipelineStep < 3"
+                    class="bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2">
+              <span x-show="isLoading('generate')" class="spinner"></span>
+              <span x-text="isLoading('generate') ? 'Generating...' : 'Generate'"></span>
+            </button>
+          </div>
+          <template x-if="pipelineResults.note">
+            <div class="mt-4 bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex items-center gap-3">
+              <svg class="w-5 h-5 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span class="font-semibold text-emerald-700 text-sm" x-text="'Pulse note for ' + pipelineResults.note.report_date"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Step 5: Email -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6" :class="pipelineStep === 4 ? 'ring-2 ring-groww/20' : ''">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+              <svg class="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            </div>
+            <div>
+              <h3 class="font-bold text-gray-900">Step 5: Send Email</h3>
+              <p class="text-xs text-gray-500">Draft, download .eml, or send via SMTP</p>
+            </div>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-3 mb-4">
+            <input x-model="emailRecipient" type="email" placeholder="Recipient email *"
+                   class="border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-groww/40 focus:border-groww"
+                   aria-label="Recipient email address">
+            <input x-model="emailName" type="text" placeholder="Recipient name (optional)"
+                   class="border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-groww/40 focus:border-groww"
+                   aria-label="Recipient name">
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <button @click="downloadPdf()"
+                    :disabled="!(latestPulse && latestPulse.report_date)"
+                    class="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              Download PDF
+            </button>
+            <button @click="handleDraftEmail()" :disabled="isLoading('email') || pipelineStep < 4"
+                    class="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+              Save Draft (.eml)
+            </button>
+            <button @click="handleSendEmail()" :disabled="isLoading('email') || pipelineStep < 4"
+                    class="bg-groww hover:bg-groww-dark text-white px-5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2">
+              <span x-show="isLoading('email')" class="spinner"></span>
+              <span x-text="isLoading('email') ? 'Sending...' : 'Send Email'"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Generated Weekly Report (shown inline after Step 4) -->
+      <div x-show="generatedReport || latestPulse" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="bg-groww-light px-6 py-4 border-b border-groww/10 flex items-center justify-between">
+          <div>
+            <h2 class="font-bold text-groww-dark text-base">Weekly Review Pulse</h2>
+            <p class="text-xs text-groww-dark/70" x-text="(generatedReport || latestPulse).report_date + ' | ' + ((generatedReport || latestPulse).period || '')"></p>
+          </div>
+          <div class="flex gap-2">
+            <button @click="downloadPdf()" class="border border-groww/30 text-groww-dark px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-groww/10" aria-label="Download PDF">Download PDF</button>
+            <button @click="navigator.clipboard.writeText((generatedReport || latestPulse).plaintext_content || (generatedReport || latestPulse).markdown_content); notify('Copied to clipboard')"
+                    class="border border-groww/30 text-groww-dark px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-groww/10" aria-label="Copy">Copy</button>
+          </div>
+        </div>
+        <div class="p-6 sm:p-8">
+          <div class="pulse-content text-sm leading-relaxed" x-html="renderMd((generatedReport || latestPulse).markdown_content)"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== WEEKLY PULSE ===================== -->
+    <section x-show="page === 'pulse'" class="fade-in" x-init="$watch('page', v => { if (v === 'pulse') loadPulseList(); })">
+      <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">Weekly Pulse Notes</h1>
+        <p class="text-sm text-gray-500 mt-1">Generate, view, download, and email your weekly review pulse.</p>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-6">
+        <!-- Sidebar -->
+        <div class="space-y-4">
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 class="font-bold text-gray-900 text-sm mb-3">Generate New Pulse</h3>
+            <button @click="handleGenerateNote()" :disabled="isLoading('generate')"
+                    class="w-full bg-groww hover:bg-groww-dark text-white px-4 py-3 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                    aria-label="Generate weekly pulse note">
+              <span x-show="isLoading('generate')" class="spinner"></span>
+              <span x-text="isLoading('generate') ? 'Generating...' : 'Generate Pulse Note'"></span>
+            </button>
+            <p class="text-[11px] text-gray-400 mt-2 text-center">Requires reviews, themes, and classifications</p>
+          </div>
+
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 class="font-bold text-gray-900 text-sm mb-3">Past Notes</h3>
+            <template x-if="pulseList.length === 0">
+              <p class="text-gray-400 text-xs text-center py-4">No notes generated yet</p>
+            </template>
+            <div class="space-y-2">
+              <template x-for="date in pulseList" :key="date">
+                <button @click="loadPulseByDate(date)"
+                        :class="latestPulse && latestPulse.report_date === date ? 'bg-groww-light border-groww text-groww-dark' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'"
+                        class="w-full text-left px-4 py-3 rounded-xl text-sm border transition-all flex items-center gap-3"
+                        :aria-label="'View pulse for ' + date" tabindex="0">
+                  <svg class="w-4 h-4 flex-shrink-0 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  <span class="font-medium" x-text="date"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 class="font-bold text-gray-900 text-sm mb-3">Email This Note</h3>
+            <input x-model="emailRecipient" type="email" placeholder="Recipient email *"
+                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-groww/40 focus:border-groww"
+                   aria-label="Recipient email">
+            <input x-model="emailName" type="text" placeholder="Name (optional)"
+                   class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-groww/40 focus:border-groww"
+                   aria-label="Recipient name">
+            <div class="space-y-2">
+              <button @click="downloadPdf()"
+                      :disabled="!latestPulse"
+                      class="w-full border border-gray-200 text-gray-700 px-3 py-2.5 rounded-xl text-xs font-medium hover:bg-gray-50 disabled:opacity-50 flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Download PDF
+              </button>
+              <div class="grid grid-cols-2 gap-2">
+                <button @click="handleDraftEmail()" :disabled="isLoading('email') || !latestPulse"
+                        class="border border-gray-200 text-gray-700 px-2 py-2.5 rounded-xl text-xs font-medium hover:bg-gray-50 disabled:opacity-50">
+                  Save Draft
+                </button>
+                <button @click="handleSendEmail()" :disabled="isLoading('email') || !latestPulse"
+                        class="bg-groww text-white px-2 py-2.5 rounded-xl text-xs font-semibold hover:bg-groww-dark disabled:opacity-50 flex items-center justify-center gap-1">
+                  <span x-show="isLoading('email')" class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
+                  <span x-text="isLoading('email') ? '' : 'Send Email'"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main: Pulse Viewer -->
+        <div class="lg:col-span-2">
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-100 min-h-[500px]">
+            <template x-if="!latestPulse">
+              <div class="flex flex-col items-center justify-center h-[500px] text-gray-400">
+                <svg class="w-16 h-16 text-gray-200 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <p class="text-sm font-medium">No pulse note selected</p>
+                <p class="text-xs mt-1">Generate one or select from the list</p>
+              </div>
+            </template>
+            <template x-if="latestPulse">
+              <div>
+                <div class="flex items-center justify-between p-5 border-b border-gray-100">
+                  <div class="flex items-center gap-3">
+                    <span class="bg-groww-light text-groww-dark text-xs font-bold px-3 py-1.5 rounded-lg" x-text="latestPulse.report_date"></span>
+                    <span class="text-xs text-gray-400" x-text="latestPulse.period || ''"></span>
+                  </div>
+                  <div class="flex gap-2 no-print">
+                    <button @click="downloadPdf()" class="border border-gray-200 text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50" aria-label="Download PDF">Download PDF</button>
+                    <button @click="navigator.clipboard.writeText(latestPulse.plaintext_content || latestPulse.markdown_content); notify('Copied')" class="border border-gray-200 text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-50" aria-label="Copy">Copy</button>
+                  </div>
+                </div>
+                <div class="p-6 sm:p-8">
+                  <div class="pulse-content text-sm leading-relaxed" x-html="renderMd(latestPulse.markdown_content)"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-gray-100 mt-16 py-6 text-center text-xs text-gray-400 no-print">
+    GROWW App Review Analyser &middot; Groq + Gemini
+  </footer>
+
+</body>
+</html>
