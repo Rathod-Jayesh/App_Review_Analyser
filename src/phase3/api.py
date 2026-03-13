@@ -6,6 +6,7 @@ from datetime import datetime
 import markdown as md_lib
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from src.common.constants import WEEKLY_NOTES_DIR
 from src.common.storage import load_reviews
@@ -107,13 +108,8 @@ def handle_list_notes():
     return {"success": True, "data": dates}
 
 
-@router.get("/download-pdf/{report_date}")
-def handle_download_pdf(report_date: str):
-    """Download the pulse note as a styled PDF."""
-    note = load_note(report_date)
-    if not note:
-        raise HTTPException(status_code=404, detail=f"No pulse note for {report_date}.")
-
+def _build_pdf(content: str, report_date: str) -> io.BytesIO:
+    """Build a styled PDF from markdown/plain text content."""
     from fpdf import FPDF
     import re
 
@@ -121,7 +117,7 @@ def handle_download_pdf(report_date: str):
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=20)
 
-    lines = note.plaintext_content.split("\n") if note.plaintext_content else note.markdown_content.split("\n")
+    lines = content.split("\n")
 
     for line in lines:
         stripped = line.strip()
@@ -181,11 +177,44 @@ def handle_download_pdf(report_date: str):
     pdf_buffer = io.BytesIO()
     pdf.output(pdf_buffer)
     pdf_buffer.seek(0)
+    return pdf_buffer
+
+
+@router.get("/download-pdf/{report_date}")
+def handle_download_pdf(report_date: str):
+    """Download the pulse note as a styled PDF (loads from disk)."""
+    note = load_note(report_date)
+    if not note:
+        raise HTTPException(status_code=404, detail=f"No pulse note for {report_date}.")
+
+    content = note.plaintext_content or note.markdown_content
+    pdf_buffer = _build_pdf(content, report_date)
 
     return StreamingResponse(
         pdf_buffer,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="pulse-{report_date}.pdf"'},
+    )
+
+
+class PdfRequest(BaseModel):
+    markdown_content: str
+    report_date: str = ""
+
+
+@router.post("/download-pdf")
+def handle_download_pdf_post(req: PdfRequest):
+    """Generate PDF from provided content (works on serverless where disk is ephemeral)."""
+    if not req.markdown_content:
+        raise HTTPException(status_code=400, detail="No content provided.")
+
+    date_label = req.report_date or datetime.now().strftime("%Y-%m-%d")
+    pdf_buffer = _build_pdf(req.markdown_content, date_label)
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="pulse-{date_label}.pdf"'},
     )
 
 

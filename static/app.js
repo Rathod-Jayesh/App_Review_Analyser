@@ -277,10 +277,30 @@ function appData() {
       this.setLoading("email", false);
     },
 
-    downloadPdf() {
-      const date = this.latestPulse && this.latestPulse.report_date;
-      if (!date) return this.notify("No pulse note available. Generate one first.", "error");
-      window.open(`/api/weekly-note/download-pdf/${date}`, "_blank");
+    async downloadPdf() {
+      if (!this.latestPulse || !this.latestPulse.markdown_content) {
+        return this.notify("No pulse note available. Generate one first.", "error");
+      }
+      try {
+        const res = await fetch("/api/weekly-note/download-pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            markdown_content: this.latestPulse.plaintext_content || this.latestPulse.markdown_content,
+            report_date: this.latestPulse.report_date || "",
+          }),
+        });
+        if (!res.ok) throw new Error("PDF generation failed");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `pulse-${this.latestPulse.report_date || "report"}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        this.notify(e.message, "error");
+      }
     },
 
     async handleRunAll() {
