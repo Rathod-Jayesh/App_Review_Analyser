@@ -114,31 +114,79 @@ def handle_download_pdf(report_date: str):
     if not note:
         raise HTTPException(status_code=404, detail=f"No pulse note for {report_date}.")
 
-    html_body = md_lib.markdown(note.markdown_content, extensions=["extra"])
-    full_html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<style>
-  body {{ font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; color: #1f2937; font-size: 14px; line-height: 1.7; }}
-  h1 {{ color: #00b386; font-size: 22px; border-bottom: 2px solid #e6faf5; padding-bottom: 8px; }}
-  h2 {{ color: #374151; font-size: 16px; margin-top: 24px; }}
-  blockquote {{ border-left: 3px solid #00d09c; padding: 8px 16px; background: #f0fdf8; font-style: italic; margin: 12px 0; border-radius: 0 6px 6px 0; }}
-  li {{ margin-bottom: 6px; }}
-  strong {{ color: #1f2937; }}
-  p {{ margin-bottom: 8px; }}
-</style></head><body>{html_body}</body></html>"""
+    from fpdf import FPDF
+    import re
 
-    try:
-        from xhtml2pdf import pisa
-        pdf_buffer = io.BytesIO()
-        pisa.CreatePDF(io.StringIO(full_html), dest=pdf_buffer)
-        pdf_buffer.seek(0)
-        return StreamingResponse(
-            pdf_buffer,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="pulse-{report_date}.pdf"'},
-        )
-    except ImportError:
-        raise HTTPException(status_code=500, detail="xhtml2pdf not installed. Run: pip install xhtml2pdf")
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=20)
+
+    lines = note.plaintext_content.split("\n") if note.plaintext_content else note.markdown_content.split("\n")
+
+    for line in lines:
+        stripped = line.strip()
+
+        if stripped.startswith("# "):
+            pdf.set_font("Helvetica", "B", 18)
+            pdf.set_text_color(0, 179, 134)
+            pdf.cell(0, 10, stripped[2:], new_x="LMARGIN", new_y="NEXT")
+            pdf.set_draw_color(0, 208, 156)
+            pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+            pdf.ln(4)
+        elif stripped.startswith("## "):
+            pdf.ln(4)
+            pdf.set_font("Helvetica", "B", 14)
+            pdf.set_text_color(55, 65, 81)
+            pdf.cell(0, 8, stripped[3:], new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(2)
+        elif stripped.startswith("### "):
+            pdf.ln(2)
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.set_text_color(75, 85, 99)
+            pdf.cell(0, 7, stripped[4:], new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(1)
+        elif stripped.startswith("> "):
+            pdf.set_font("Helvetica", "I", 10)
+            pdf.set_text_color(55, 65, 81)
+            clean = re.sub(r"[*_`]", "", stripped[2:])
+            pdf.set_x(15)
+            pdf.multi_cell(175, 5, f'"{clean}"')
+            pdf.ln(2)
+        elif stripped.startswith("- ") or stripped.startswith("* "):
+            pdf.set_font("Helvetica", "", 10)
+            pdf.set_text_color(31, 41, 55)
+            clean = re.sub(r"\*\*(.+?)\*\*", r"\1", stripped[2:])
+            clean = re.sub(r"[*_`]", "", clean)
+            pdf.set_x(15)
+            pdf.multi_cell(175, 5, f"  {clean}")
+            pdf.ln(1)
+        elif re.match(r"^\d+\.\s", stripped):
+            pdf.set_font("Helvetica", "", 10)
+            pdf.set_text_color(31, 41, 55)
+            clean = re.sub(r"\*\*(.+?)\*\*", r"\1", stripped)
+            clean = re.sub(r"[*_`]", "", clean)
+            pdf.set_x(15)
+            pdf.multi_cell(175, 5, f"  {clean}")
+            pdf.ln(1)
+        elif stripped:
+            pdf.set_font("Helvetica", "", 10)
+            pdf.set_text_color(75, 85, 99)
+            clean = re.sub(r"\*\*(.+?)\*\*", r"\1", stripped)
+            clean = re.sub(r"[*_`]", "", clean)
+            pdf.multi_cell(0, 5, clean)
+            pdf.ln(2)
+        else:
+            pdf.ln(3)
+
+    pdf_buffer = io.BytesIO()
+    pdf.output(pdf_buffer)
+    pdf_buffer.seek(0)
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="pulse-{report_date}.pdf"'},
+    )
 
 
 @router.get("/{report_date}")
