@@ -57,7 +57,7 @@ Classify each review. Return JSON:
 def _classify_batch_with_retry(
     themes: list[Theme],
     batch: list[Review],
-    max_retries: int = 3,
+    max_retries: int = 6,
 ) -> list[ClassifiedReview]:
     prompt = _build_classification_prompt(themes, batch)
 
@@ -111,8 +111,8 @@ def _classify_batch_with_retry(
 
         except Exception as exc:
             if "rate_limit" in str(exc).lower() or "413" in str(exc):
-                wait = 65 * (attempt + 1)
-                logger.info("Rate limited — waiting %ds (attempt %d)", wait, attempt + 1)
+                wait = 70 * (attempt + 1)
+                logger.info("Rate limited — waiting %ds (attempt %d/%d)", wait, attempt + 1, max_retries)
                 time.sleep(wait)
             else:
                 raise
