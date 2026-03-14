@@ -46,7 +46,8 @@ def send_email(draft: EmailDraft) -> None:
 
 def _send_via_resend(draft: EmailDraft) -> None:
     """Send email via Resend HTTP API — works on all cloud platforms."""
-    logger.info("Sending via Resend API to %s ...", draft.to)
+    sender = "GROWW Review Pulse <onboarding@resend.dev>"
+    logger.info("Sending via Resend API from %s to %s ...", sender, draft.to)
 
     resp = requests.post(
         "https://api.resend.com/emails",
@@ -55,7 +56,7 @@ def _send_via_resend(draft: EmailDraft) -> None:
             "Content-Type": "application/json",
         },
         json={
-            "from": f"GROWW Review Pulse <{settings.email_sender}>",
+            "from": sender,
             "to": [draft.to],
             "subject": draft.subject,
             "html": draft.html_body,
