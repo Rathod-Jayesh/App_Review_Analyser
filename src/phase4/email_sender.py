@@ -52,33 +52,39 @@ def send_email(draft: EmailDraft) -> None:
 
     socket.getaddrinfo = _ipv4_only_getaddrinfo
 
-    try:
-        try:
-            logger.info("Trying SMTP SSL on %s:465 ...", host)
-            ctx = ssl.create_default_context()
-            with smtplib.SMTP_SSL(host, 465, timeout=30, context=ctx) as server:
-                server.login(sender, password)
-                server.sendmail(sender, [draft.to], msg.as_string())
-            logger.info("Email sent to %s (SSL/465)", draft.to)
-            return
-        except Exception as ssl_err:
-            logger.warning("SSL/465 failed: %s — trying STARTTLS/587", ssl_err)
+    ssl_err_msg = ""
 
-        try:
-            logger.info("Trying SMTP STARTTLS on %s:587 ...", host)
-            with smtplib.SMTP(host, 587, timeout=30) as server:
-                server.ehlo()
-                server.starttls(context=ssl.create_default_context())
-                server.ehlo()
-                server.login(sender, password)
-                server.sendmail(sender, [draft.to], msg.as_string())
-            logger.info("Email sent to %s (STARTTLS/587)", draft.to)
-            return
-        except Exception as tls_err:
-            logger.error("STARTTLS/587 also failed: %s", tls_err)
-            raise RuntimeError(
-                f"Could not send email. SSL/465: {ssl_err} | STARTTLS/587: {tls_err}"
-            )
+    try:
+        logger.info("Trying SMTP SSL on %s:465 ...", host)
+        ctx = ssl.create_default_context()
+        with smtplib.SMTP_SSL(host, 465, timeout=30, context=ctx) as server:
+            server.login(sender, password)
+            server.sendmail(sender, [draft.to], msg.as_string())
+        logger.info("Email sent to %s (SSL/465)", draft.to)
+        return
+    except Exception as exc:
+        ssl_err_msg = str(exc)
+        logger.warning("SSL/465 failed: %s — trying STARTTLS/587", exc)
+    finally:
+        socket.getaddrinfo = _original_getaddrinfo
+
+    socket.getaddrinfo = _ipv4_only_getaddrinfo
+
+    try:
+        logger.info("Trying SMTP STARTTLS on %s:587 ...", host)
+        with smtplib.SMTP(host, 587, timeout=30) as server:
+            server.ehlo()
+            server.starttls(context=ssl.create_default_context())
+            server.ehlo()
+            server.login(sender, password)
+            server.sendmail(sender, [draft.to], msg.as_string())
+        logger.info("Email sent to %s (STARTTLS/587)", draft.to)
+        return
+    except Exception as exc:
+        logger.error("STARTTLS/587 also failed: %s", exc)
+        raise RuntimeError(
+            f"Could not send email. SSL/465: {ssl_err_msg} | STARTTLS/587: {exc}"
+        )
     finally:
         socket.getaddrinfo = _original_getaddrinfo
 
