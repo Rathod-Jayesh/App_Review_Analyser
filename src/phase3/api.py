@@ -108,6 +108,14 @@ def handle_list_notes():
     return {"success": True, "data": dates}
 
 
+def _safe_text(text: str) -> str:
+    """Remove unicode chars that fpdf2's built-in fonts can't render."""
+    import re
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"[*_`]", "", text)
+    return text.encode("latin-1", errors="replace").decode("latin-1")
+
+
 def _build_pdf(content: str, report_date: str) -> io.BytesIO:
     """Build a styled PDF from markdown/plain text content."""
     from fpdf import FPDF
@@ -122,57 +130,57 @@ def _build_pdf(content: str, report_date: str) -> io.BytesIO:
     for line in lines:
         stripped = line.strip()
 
-        if stripped.startswith("# "):
-            pdf.set_font("Helvetica", "B", 18)
-            pdf.set_text_color(0, 179, 134)
-            pdf.cell(0, 10, stripped[2:], new_x="LMARGIN", new_y="NEXT")
-            pdf.set_draw_color(0, 208, 156)
-            pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-            pdf.ln(4)
-        elif stripped.startswith("## "):
-            pdf.ln(4)
-            pdf.set_font("Helvetica", "B", 14)
-            pdf.set_text_color(55, 65, 81)
-            pdf.cell(0, 8, stripped[3:], new_x="LMARGIN", new_y="NEXT")
-            pdf.ln(2)
-        elif stripped.startswith("### "):
-            pdf.ln(2)
-            pdf.set_font("Helvetica", "B", 12)
+        try:
+            if stripped.startswith("# "):
+                pdf.set_font("Helvetica", "B", 18)
+                pdf.set_text_color(0, 179, 134)
+                pdf.cell(0, 10, _safe_text(stripped[2:]), new_x="LMARGIN", new_y="NEXT")
+                pdf.set_draw_color(0, 208, 156)
+                pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+                pdf.ln(4)
+            elif stripped.startswith("## "):
+                pdf.ln(4)
+                pdf.set_font("Helvetica", "B", 14)
+                pdf.set_text_color(55, 65, 81)
+                pdf.cell(0, 8, _safe_text(stripped[3:]), new_x="LMARGIN", new_y="NEXT")
+                pdf.ln(2)
+            elif stripped.startswith("### "):
+                pdf.ln(2)
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.set_text_color(75, 85, 99)
+                pdf.cell(0, 7, _safe_text(stripped[4:]), new_x="LMARGIN", new_y="NEXT")
+                pdf.ln(1)
+            elif stripped.startswith("> "):
+                pdf.set_font("Helvetica", "I", 10)
+                pdf.set_text_color(55, 65, 81)
+                pdf.set_x(15)
+                pdf.multi_cell(175, 5, '"' + _safe_text(stripped[2:]) + '"')
+                pdf.ln(2)
+            elif stripped.startswith("- ") or stripped.startswith("* "):
+                pdf.set_font("Helvetica", "", 10)
+                pdf.set_text_color(31, 41, 55)
+                pdf.set_x(15)
+                pdf.multi_cell(175, 5, "  " + _safe_text(stripped[2:]))
+                pdf.ln(1)
+            elif re.match(r"^\d+\.\s", stripped):
+                pdf.set_font("Helvetica", "", 10)
+                pdf.set_text_color(31, 41, 55)
+                pdf.set_x(15)
+                pdf.multi_cell(175, 5, "  " + _safe_text(stripped))
+                pdf.ln(1)
+            elif stripped:
+                pdf.set_font("Helvetica", "", 10)
+                pdf.set_text_color(75, 85, 99)
+                pdf.multi_cell(0, 5, _safe_text(stripped))
+                pdf.ln(2)
+            else:
+                pdf.ln(3)
+        except Exception:
+            pdf.set_font("Helvetica", "", 10)
             pdf.set_text_color(75, 85, 99)
-            pdf.cell(0, 7, stripped[4:], new_x="LMARGIN", new_y="NEXT")
+            safe = stripped.encode("ascii", errors="replace").decode("ascii")
+            pdf.multi_cell(0, 5, safe)
             pdf.ln(1)
-        elif stripped.startswith("> "):
-            pdf.set_font("Helvetica", "I", 10)
-            pdf.set_text_color(55, 65, 81)
-            clean = re.sub(r"[*_`]", "", stripped[2:])
-            pdf.set_x(15)
-            pdf.multi_cell(175, 5, f'"{clean}"')
-            pdf.ln(2)
-        elif stripped.startswith("- ") or stripped.startswith("* "):
-            pdf.set_font("Helvetica", "", 10)
-            pdf.set_text_color(31, 41, 55)
-            clean = re.sub(r"\*\*(.+?)\*\*", r"\1", stripped[2:])
-            clean = re.sub(r"[*_`]", "", clean)
-            pdf.set_x(15)
-            pdf.multi_cell(175, 5, f"  {clean}")
-            pdf.ln(1)
-        elif re.match(r"^\d+\.\s", stripped):
-            pdf.set_font("Helvetica", "", 10)
-            pdf.set_text_color(31, 41, 55)
-            clean = re.sub(r"\*\*(.+?)\*\*", r"\1", stripped)
-            clean = re.sub(r"[*_`]", "", clean)
-            pdf.set_x(15)
-            pdf.multi_cell(175, 5, f"  {clean}")
-            pdf.ln(1)
-        elif stripped:
-            pdf.set_font("Helvetica", "", 10)
-            pdf.set_text_color(75, 85, 99)
-            clean = re.sub(r"\*\*(.+?)\*\*", r"\1", stripped)
-            clean = re.sub(r"[*_`]", "", clean)
-            pdf.multi_cell(0, 5, clean)
-            pdf.ln(2)
-        else:
-            pdf.ln(3)
 
     pdf_buffer = io.BytesIO()
     pdf.output(pdf_buffer)
