@@ -9,6 +9,7 @@ from src.phase1.api import router as phase1_router
 from src.phase2.api import router as phase2_router
 from src.phase3.api import router as phase3_router
 from src.phase4.api import router as phase4_router
+from src.pipeline_api import router as pipeline_router
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -30,6 +31,7 @@ app.include_router(phase1_router)
 app.include_router(phase2_router)
 app.include_router(phase3_router)
 app.include_router(phase4_router)
+app.include_router(pipeline_router)
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 

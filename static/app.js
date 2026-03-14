@@ -311,21 +311,56 @@ function appData() {
       this.generatedReport = null;
       this.emlFile = null;
 
-      this.addLog("Starting full pipeline...");
+      this.addLog("Starting full pipeline (single request)...");
+      this.addLog(`Config: ${this.fetchWeeks} weeks, max ${this.maxReviews} reviews`);
 
-      await this.handleFetchReviews();
-      if (this.pipelineStep < 1) { this.pipelineRunning = false; return; }
+      try {
+        const res = await api("POST", "/api/pipeline/run-all", {
+          weeks: this.fetchWeeks,
+          max_reviews: this.maxReviews,
+        });
 
-      await this.handleGenerateThemes();
-      if (this.pipelineStep < 2) { this.pipelineRunning = false; return; }
+        if (res.success) {
+          const d = res.data;
+          const steps = res.steps_completed || [];
 
-      await this.handleClassifyReviews();
-      if (this.pipelineStep < 3) { this.pipelineRunning = false; return; }
+          if (d.fetch) {
+            this.pipelineResults.fetch = d.fetch;
+            this.pipelineStep = 1;
+            this.addLog(`Fetched ${d.fetch.total_count} reviews (${d.fetch.raw_fetched} raw, ${d.fetch.filtered_out} filtered)`);
+          }
+          if (d.themes) {
+            this.pipelineResults.themes = d.themes;
+            this.themes = d.themes.themes || [];
+            this.pipelineStep = 2;
+            this.addLog(`Discovered ${d.themes.theme_count} themes`);
+          }
+          if (d.classify) {
+            this.pipelineResults.classify = d.classify;
+            this.classificationDist = d.classify.theme_distribution || {};
+            this.pipelineStep = 3;
+            this.addLog(`Classified ${d.classify.total_classified} reviews`);
+          }
+          if (d.note) {
+            this.pipelineResults.note = d.note;
+            this.latestPulse = d.note;
+            this.generatedReport = d.note;
+            this.pipelineStep = 4;
+            this.addLog(`Pulse note generated for ${d.note.report_date}`);
+          }
 
-      await this.handleGenerateNote();
-      if (this.pipelineStep < 4) { this.pipelineRunning = false; return; }
+          this.addLog(`Pipeline complete (${steps.length}/4 steps). Weekly report is ready below.`);
+          this.notify("Pipeline complete! Report generated.");
+          await this.loadDashboard();
+        } else {
+          this.addLog("Pipeline failed: " + (res.detail || "Unknown error"));
+          this.notify(res.detail || "Pipeline failed", "error");
+        }
+      } catch (e) {
+        this.addLog("Pipeline error: " + e.message);
+        this.notify(e.message, "error");
+      }
 
-      this.addLog("Pipeline complete. Weekly report is ready below.");
       this.pipelineRunning = false;
     },
 
