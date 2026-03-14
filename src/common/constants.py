@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     email_sender: str = ""
     email_password: str = ""
+    resend_api_key: str = ""
 
 
 settings = Settings()
