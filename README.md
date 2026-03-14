@@ -111,6 +111,20 @@ The pipeline also runs automatically via GitHub Actions every **Monday at 12:35 
 
 Go to **Actions → Weekly Review Pulse → Run workflow** to trigger manually with custom week range and review count.
 
+## Deploy on Render (Recommended)
+
+Render has **no timeout limits** — supports 3000 reviews, 12 weeks, full pipeline without issues.
+
+1. Go to **[render.com](https://render.com)** → Sign up with GitHub
+2. Click **New → Web Service** → Connect **App_Review_Analyser**
+3. Set **Runtime** to **Python** (or Docker — both work)
+4. Render auto-detects the start command from `render.yaml`
+5. Add **Environment Variables**:
+   - `GROQ_API_KEY`, `GEMINI_API_KEY`, `EMAIL_SENDER`, `EMAIL_PASSWORD`
+6. Click **Create Web Service** → wait 3-5 min → your app is live
+
+> Free tier note: Render spins down after 15 min of inactivity. First request after idle takes ~30s to wake up.
+
 ## Project Structure
 
 ```
