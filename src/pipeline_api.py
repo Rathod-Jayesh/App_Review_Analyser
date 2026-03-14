@@ -69,7 +69,7 @@ def handle_run_all(config: Optional[PipelineConfig] = None):
             "themes": [t.model_dump() for t in theme_store.themes],
         }
         steps_completed.append("themes")
-        logger.info("Phase 2a done: %d themes — cooling down 90s before classification", len(theme_store.themes))
+        logger.info("Phase 2a done: %d themes — cooling down 30s before classification", len(theme_store.themes))
     except Exception as exc:
         raise HTTPException(
             status_code=500,
@@ -77,7 +77,7 @@ def handle_run_all(config: Optional[PipelineConfig] = None):
         )
 
     import time
-    time.sleep(90)
+    time.sleep(30)
 
     try:
         classification_store = classify_all_reviews(

@@ -311,6 +311,10 @@ function appData() {
       }
     },
 
+    sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    },
+
     async handleRunAll() {
       this.pipelineRunning = true;
       this.pipelineStep = 0;
@@ -319,51 +323,51 @@ function appData() {
       this.generatedReport = null;
       this.emlFile = null;
 
-      this.addLog("Starting full pipeline (single request)...");
+      this.addLog("Starting full pipeline (step-by-step)...");
       this.addLog(`Config: ${this.fetchWeeks} weeks, max ${this.maxReviews} reviews`);
 
       try {
-        const res = await api("POST", "/api/pipeline/run-all", {
+        this.addLog("Step 1/4: Fetching reviews...");
+        const fetchRes = await api("POST", "/api/reviews/fetch", {
           weeks: this.fetchWeeks,
           max_reviews: this.maxReviews,
         });
+        if (!fetchRes.success) throw new Error("Fetch failed: " + (fetchRes.detail || "Unknown"));
+        this.pipelineResults.fetch = fetchRes.data;
+        this.pipelineStep = 1;
+        this.addLog(`Fetched ${fetchRes.data.total_count} reviews (${fetchRes.data.raw_fetched} raw, ${fetchRes.data.filtered_out} filtered)`);
 
-        if (res.success) {
-          const d = res.data;
-          const steps = res.steps_completed || [];
+        this.addLog("Step 2/4: Discovering themes with Groq LLM...");
+        const themeRes = await api("POST", "/api/themes/generate");
+        if (!themeRes.success) throw new Error("Theme generation failed: " + (themeRes.detail || "Unknown"));
+        this.pipelineResults.themes = themeRes.data;
+        this.themes = themeRes.data.themes || [];
+        this.pipelineStep = 2;
+        this.addLog(`Discovered ${themeRes.data.theme_count} themes`);
 
-          if (d.fetch) {
-            this.pipelineResults.fetch = d.fetch;
-            this.pipelineStep = 1;
-            this.addLog(`Fetched ${d.fetch.total_count} reviews (${d.fetch.raw_fetched} raw, ${d.fetch.filtered_out} filtered)`);
-          }
-          if (d.themes) {
-            this.pipelineResults.themes = d.themes;
-            this.themes = d.themes.themes || [];
-            this.pipelineStep = 2;
-            this.addLog(`Discovered ${d.themes.theme_count} themes`);
-          }
-          if (d.classify) {
-            this.pipelineResults.classify = d.classify;
-            this.classificationDist = d.classify.theme_distribution || {};
-            this.pipelineStep = 3;
-            this.addLog(`Classified ${d.classify.total_classified} reviews`);
-          }
-          if (d.note) {
-            this.pipelineResults.note = d.note;
-            this.latestPulse = d.note;
-            this.generatedReport = d.note;
-            this.pipelineStep = 4;
-            this.addLog(`Pulse note generated for ${d.note.report_date}`);
-          }
+        this.addLog("Cooling down 60s before classification (Groq rate limit)...");
+        await this.sleep(60000);
 
-          this.addLog(`Pipeline complete (${steps.length}/4 steps). Weekly report is ready below.`);
-          this.notify("Pipeline complete! Report generated.");
-          await this.loadDashboard();
-        } else {
-          this.addLog("Pipeline failed: " + (res.detail || "Unknown error"));
-          this.notify(res.detail || "Pipeline failed", "error");
-        }
+        this.addLog("Step 3/4: Classifying reviews into themes...");
+        const classRes = await api("POST", "/api/themes/classify");
+        if (!classRes.success) throw new Error("Classification failed: " + (classRes.detail || "Unknown"));
+        this.pipelineResults.classify = classRes.data;
+        this.classificationDist = classRes.data.theme_distribution || {};
+        this.pipelineStep = 3;
+        this.addLog(`Classified ${classRes.data.total_classified} reviews`);
+
+        this.addLog("Step 4/4: Generating weekly pulse note with Gemini...");
+        const noteRes = await api("POST", `/api/weekly-note/generate?weeks=${this.fetchWeeks}`);
+        if (!noteRes.success) throw new Error("Note generation failed: " + (noteRes.detail || "Unknown"));
+        this.pipelineResults.note = noteRes.data;
+        this.latestPulse = noteRes.data;
+        this.generatedReport = noteRes.data;
+        this.pipelineStep = 4;
+        this.addLog(`Pulse note generated for ${noteRes.data.report_date}`);
+
+        this.addLog("Pipeline complete (4/4 steps). Weekly report is ready below.");
+        this.notify("Pipeline complete! Report generated.");
+        await this.loadDashboard();
       } catch (e) {
         this.addLog("Pipeline error: " + e.message);
         this.notify(e.message, "error");
