@@ -345,8 +345,8 @@ function appData() {
         this.pipelineStep = 2;
         this.addLog(`Discovered ${themeRes.data.theme_count} themes`);
 
-        this.addLog("Cooling down 60s before classification (Groq rate limit)...");
-        await this.sleep(60000);
+        this.addLog("Cooling down 15s before classification (Groq rate limit)...");
+        await this.sleep(15000);
 
         this.addLog("Step 3/4: Classifying reviews into themes...");
         const classRes = await api("POST", "/api/themes/classify");

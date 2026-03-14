@@ -172,34 +172,16 @@ def _extract_themes_from_batch(reviews: list[Review]) -> list[dict]:
 
 def generate_themes(reviews: list[Review]) -> ThemeStore:
     """
-    Analyze ALL reviews by splitting into token-safe batches,
-    extracting themes per batch, then merging into final 3-5 themes.
+    Use a stratified sample of reviews to discover 3-5 themes quickly.
+    Sampling keeps it to a single LLM call instead of many batches.
     """
     if not reviews:
         raise ValueError("No reviews available for theme discovery")
 
-    batches = _split_into_batches(reviews)
-    logger.info("Split %d reviews into %d batches", len(reviews), len(batches))
+    sampled = sample_reviews(reviews, sample_size=100)
+    logger.info("Sampled %d reviews (from %d total) for theme discovery", len(sampled), len(reviews))
 
-    all_batch_themes: list[list[dict]] = []
-
-    for i, batch in enumerate(batches):
-        logger.info("Processing batch %d/%d (%d reviews)", i + 1, len(batches), len(batch))
-        themes = _extract_themes_from_batch(batch)
-        all_batch_themes.append(themes)
-
-        if i < len(batches) - 1:
-            logger.info("Waiting 90s for rate-limit cooldown...")
-            time.sleep(90)
-
-    if len(all_batch_themes) == 1:
-        final_themes_raw = all_batch_themes[0]
-    else:
-        logger.info("Merging themes from %d batches...", len(all_batch_themes))
-        merge_prompt = _build_merge_prompt(all_batch_themes)
-        merge_raw = _call_with_retry(MERGE_SYSTEM_PROMPT, merge_prompt)
-        parsed = json.loads(merge_raw)
-        final_themes_raw = parsed.get("themes", [])
+    final_themes_raw = _extract_themes_from_batch(sampled)
 
     themes = [
         Theme(id=t["id"], name=t["name"], description=t["description"])
