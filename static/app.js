@@ -234,10 +234,12 @@ function appData() {
       this.setLoading("email", true);
       this.addLog("Saving email draft (.eml)...");
       try {
-        const res = await api("POST", "/api/email/draft", {
+        const payload = {
           recipient: this.emailRecipient,
           recipient_name: this.emailName || null,
-        });
+        };
+        if (this.latestPulse) payload.report_date = this.latestPulse.report_date || null;
+        const res = await api("POST", "/api/email/draft", payload);
         if (res.success) {
           this.emlFile = res.data.report_date;
           this.addLog("Draft saved: " + res.data.eml_file);
@@ -256,11 +258,17 @@ function appData() {
       this.setLoading("email", true);
       this.addLog("Sending email to " + this.emailRecipient + "...");
       try {
-        const res = await api("POST", "/api/email/send", {
+        const payload = {
           recipient: this.emailRecipient,
           recipient_name: this.emailName || null,
           send: true,
-        });
+        };
+        if (this.latestPulse) {
+          payload.report_date = this.latestPulse.report_date || null;
+          payload.markdown_content = this.latestPulse.markdown_content || null;
+          payload.plaintext_content = this.latestPulse.plaintext_content || null;
+        }
+        const res = await api("POST", "/api/email/send", payload);
         if (res.success) {
           this.emlFile = res.data.report_date;
           const msg = `Email sent to ${res.data.to}`;
@@ -286,7 +294,7 @@ function appData() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            markdown_content: this.latestPulse.plaintext_content || this.latestPulse.markdown_content,
+            markdown_content: this.latestPulse.markdown_content,
             report_date: this.latestPulse.report_date || "",
           }),
         });

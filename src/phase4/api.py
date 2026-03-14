@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 from src.common.constants import WEEKLY_NOTES_DIR
+from src.common.models import PulseNote
 from src.phase3.note_generator import load_latest_note, load_note
 from src.phase4.email_composer import compose_email
 from src.phase4.email_sender import save_draft_eml, send_email
@@ -25,17 +27,12 @@ class SendRequest(BaseModel):
     recipient: str
     recipient_name: str | None = None
     send: bool = False
+    markdown_content: str | None = None
+    plaintext_content: str | None = None
 
 
 @router.post("/draft")
 def handle_draft_email(body: DraftRequest):
-    """
-    Generate an email draft (.eml) from the pulse note.
-    Dry-run — writes to data/weekly-notes/pulse-YYYY-MM-DD.eml
-    without connecting to SMTP.
-
-    recipient is required (provided by the frontend).
-    """
     note = _resolve_note(body.report_date)
 
     draft = compose_email(
@@ -62,14 +59,23 @@ def handle_draft_email(body: DraftRequest):
 
 @router.post("/send")
 def handle_send_email(body: SendRequest):
-    """
-    Compose and optionally send the email via SMTP.
-    send=false (default): dry-run, saves .eml only.
-    send=true: sends via SMTP+TLS (requires EMAIL_SENDER & EMAIL_PASSWORD in .env).
+    note = None
 
-    recipient is required (provided by the frontend).
-    """
-    note = _resolve_note(body.report_date)
+    if body.markdown_content:
+        note = PulseNote(
+            report_date=body.report_date or datetime.now().strftime("%Y-%m-%d"),
+            period_start="",
+            period_end="",
+            total_reviews=0,
+            average_rating=0,
+            generated_at=datetime.now().isoformat(),
+            md_file="",
+            txt_file="",
+            markdown_content=body.markdown_content,
+            plaintext_content=body.plaintext_content or body.markdown_content,
+        )
+    else:
+        note = _resolve_note(body.report_date)
 
     draft = compose_email(
         note=note,
@@ -95,8 +101,6 @@ def handle_send_email(body: SendRequest):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
-    eml_path = save_draft_eml(draft)
-
     return {
         "success": True,
         "mode": "sent",
@@ -104,14 +108,12 @@ def handle_send_email(body: SendRequest):
             "to": draft.to,
             "subject": draft.subject,
             "report_date": draft.report_date,
-            "eml_file": eml_path,
         },
     }
 
 
 @router.get("/download/{report_date}")
 def handle_download_eml(report_date: str):
-    """Download the .eml draft file for a given report date."""
     eml_path = WEEKLY_NOTES_DIR / f"pulse-{report_date}.eml"
     if not eml_path.exists():
         raise HTTPException(status_code=404, detail=f"No .eml file for {report_date}. Save a draft first.")
@@ -124,7 +126,6 @@ def handle_download_eml(report_date: str):
 
 
 def _resolve_note(report_date: str | None):
-    """Load a pulse note by date, or fall back to the latest."""
     if report_date:
         note = load_note(report_date)
         if not note:
