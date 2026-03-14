@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 import smtplib
+import socket
+import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -11,12 +13,16 @@ from src.common.models import EmailDraft
 
 logger = logging.getLogger(__name__)
 
+_original_getaddrinfo = socket.getaddrinfo
+
+
+def _ipv4_only_getaddrinfo(*args, **kwargs):
+    """Force IPv4 resolution — fixes 'Network is unreachable' on cloud platforms."""
+    responses = _original_getaddrinfo(*args, **kwargs)
+    return [r for r in responses if r[0] == socket.AF_INET] or responses
+
 
 def save_draft_eml(draft: EmailDraft) -> str:
-    """
-    Dry-run: write the email as an .eml file (RFC 2822) without connecting to SMTP.
-    Returns the file path.
-    """
     msg = _build_mime_message(draft)
 
     WEEKLY_NOTES_DIR.mkdir(parents=True, exist_ok=True)
@@ -29,9 +35,9 @@ def save_draft_eml(draft: EmailDraft) -> str:
 
 def send_email(draft: EmailDraft) -> None:
     """
-    Send the email via SMTP.
-    Tries SSL on port 465 first (works on Render/cloud),
-    falls back to STARTTLS on port 587 (works locally).
+    Send email via Gmail SMTP.
+    Forces IPv4 to avoid 'Network is unreachable' on cloud platforms.
+    Tries SSL/465 first, then STARTTLS/587.
     """
     sender = settings.email_sender
     password = settings.email_password
@@ -42,32 +48,39 @@ def send_email(draft: EmailDraft) -> None:
         )
 
     msg = _build_mime_message(draft)
+    host = settings.smtp_host
+
+    socket.getaddrinfo = _ipv4_only_getaddrinfo
 
     try:
-        logger.info("Trying SMTP SSL on %s:465 ...", settings.smtp_host)
-        with smtplib.SMTP_SSL(settings.smtp_host, 465, timeout=30) as server:
-            server.login(sender, password)
-            server.sendmail(sender, [draft.to], msg.as_string())
-        logger.info("Email sent to %s (SSL/465)", draft.to)
-        return
-    except Exception as ssl_err:
-        logger.warning("SSL/465 failed: %s — trying STARTTLS/587", ssl_err)
+        try:
+            logger.info("Trying SMTP SSL on %s:465 ...", host)
+            ctx = ssl.create_default_context()
+            with smtplib.SMTP_SSL(host, 465, timeout=30, context=ctx) as server:
+                server.login(sender, password)
+                server.sendmail(sender, [draft.to], msg.as_string())
+            logger.info("Email sent to %s (SSL/465)", draft.to)
+            return
+        except Exception as ssl_err:
+            logger.warning("SSL/465 failed: %s — trying STARTTLS/587", ssl_err)
 
-    try:
-        logger.info("Trying SMTP STARTTLS on %s:587 ...", settings.smtp_host)
-        with smtplib.SMTP(settings.smtp_host, 587, timeout=30) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(sender, password)
-            server.sendmail(sender, [draft.to], msg.as_string())
-        logger.info("Email sent to %s (STARTTLS/587)", draft.to)
-        return
-    except Exception as tls_err:
-        logger.error("STARTTLS/587 also failed: %s", tls_err)
-        raise RuntimeError(
-            f"Could not send email. SSL/465: {ssl_err} | STARTTLS/587: {tls_err}"
-        )
+        try:
+            logger.info("Trying SMTP STARTTLS on %s:587 ...", host)
+            with smtplib.SMTP(host, 587, timeout=30) as server:
+                server.ehlo()
+                server.starttls(context=ssl.create_default_context())
+                server.ehlo()
+                server.login(sender, password)
+                server.sendmail(sender, [draft.to], msg.as_string())
+            logger.info("Email sent to %s (STARTTLS/587)", draft.to)
+            return
+        except Exception as tls_err:
+            logger.error("STARTTLS/587 also failed: %s", tls_err)
+            raise RuntimeError(
+                f"Could not send email. SSL/465: {ssl_err} | STARTTLS/587: {tls_err}"
+            )
+    finally:
+        socket.getaddrinfo = _original_getaddrinfo
 
 
 def _build_mime_message(draft: EmailDraft) -> MIMEMultipart:
