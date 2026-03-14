@@ -29,8 +29,9 @@ def save_draft_eml(draft: EmailDraft) -> str:
 
 def send_email(draft: EmailDraft) -> None:
     """
-    Send the email via SMTP with TLS.
-    Requires EMAIL_SENDER and EMAIL_PASSWORD in .env.
+    Send the email via SMTP.
+    Tries SSL on port 465 first (works on Render/cloud),
+    falls back to STARTTLS on port 587 (works locally).
     """
     sender = settings.email_sender
     password = settings.email_password
@@ -42,16 +43,31 @@ def send_email(draft: EmailDraft) -> None:
 
     msg = _build_mime_message(draft)
 
-    logger.info("Connecting to %s:%s ...", settings.smtp_host, settings.smtp_port)
+    try:
+        logger.info("Trying SMTP SSL on %s:465 ...", settings.smtp_host)
+        with smtplib.SMTP_SSL(settings.smtp_host, 465, timeout=30) as server:
+            server.login(sender, password)
+            server.sendmail(sender, [draft.to], msg.as_string())
+        logger.info("Email sent to %s (SSL/465)", draft.to)
+        return
+    except Exception as ssl_err:
+        logger.warning("SSL/465 failed: %s — trying STARTTLS/587", ssl_err)
 
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.login(sender, password)
-        server.sendmail(sender, [draft.to], msg.as_string())
-
-    logger.info("Email sent to %s", draft.to)
+    try:
+        logger.info("Trying SMTP STARTTLS on %s:587 ...", settings.smtp_host)
+        with smtplib.SMTP(settings.smtp_host, 587, timeout=30) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(sender, password)
+            server.sendmail(sender, [draft.to], msg.as_string())
+        logger.info("Email sent to %s (STARTTLS/587)", draft.to)
+        return
+    except Exception as tls_err:
+        logger.error("STARTTLS/587 also failed: %s", tls_err)
+        raise RuntimeError(
+            f"Could not send email. SSL/465: {ssl_err} | STARTTLS/587: {tls_err}"
+        )
 
 
 def _build_mime_message(draft: EmailDraft) -> MIMEMultipart:
