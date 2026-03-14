@@ -32,9 +32,10 @@ function appData() {
     loading: {},
     dashLoading: true,
     toast: { show: false, msg: "", type: "success" },
+    showPipeline: false,
 
-    fetchWeeks: 12,
-    maxReviews: 3000,
+    fetchWeeks: 8,
+    maxReviews: 500,
 
     stats: {
       reviews: 0, themes: 0, classifications: 0,
@@ -77,6 +78,10 @@ function appData() {
     addLog(msg) {
       const now = new Date().toLocaleTimeString();
       this.pipelineLog.push({ time: now, msg });
+      this.$nextTick(() => {
+        const el = this.$refs.logScroll;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
     },
 
     async loadDashboard() {
@@ -316,6 +321,7 @@ function appData() {
     },
 
     async handleRunAll() {
+      this.showPipeline = true;
       this.pipelineRunning = true;
       this.pipelineStep = 0;
       this.pipelineResults = {};
@@ -345,8 +351,8 @@ function appData() {
         this.pipelineStep = 2;
         this.addLog(`Discovered ${themeRes.data.theme_count} themes`);
 
-        this.addLog("Cooling down 15s before classification (Groq rate limit)...");
-        await this.sleep(15000);
+        this.addLog("Cooling down 5s before classification...");
+        await this.sleep(5000);
 
         this.addLog("Step 3/4: Classifying reviews into themes...");
         const classRes = await api("POST", "/api/themes/classify");
@@ -398,6 +404,7 @@ function appData() {
       this.page = pg;
       if (pg === "dashboard") this.loadDashboard();
       if (pg === "pulse") { this.loadDashboard(); this.loadPulseList(); }
+      window.scrollTo({ top: 0, behavior: "smooth" });
     },
 
     formatDate(iso) {

@@ -17,7 +17,7 @@ from src.common.models import (
 
 logger = logging.getLogger(__name__)
 
-BATCH_SIZE = 25
+BATCH_SIZE = 50
 
 CLASSIFICATION_SYSTEM_PROMPT = """You are a review classifier for GROWW app reviews.
 You will be given a set of themes and a batch of reviews.
@@ -111,7 +111,7 @@ def _classify_batch_with_retry(
 
         except Exception as exc:
             if "rate_limit" in str(exc).lower() or "413" in str(exc):
-                wait = 70 * (attempt + 1)
+                wait = 20 * (attempt + 1)
                 logger.info("Rate limited — waiting %ds (attempt %d/%d)", wait, attempt + 1, max_retries)
                 time.sleep(wait)
             else:
@@ -147,7 +147,7 @@ def classify_all_reviews(
         all_classifications.extend(results)
 
         if i + BATCH_SIZE < len(reviews):
-            time.sleep(8)
+            time.sleep(3)
 
     distribution = dict(Counter(c.theme_id for c in all_classifications))
 

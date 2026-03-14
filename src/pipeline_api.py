@@ -77,7 +77,7 @@ def handle_run_all(config: Optional[PipelineConfig] = None):
         )
 
     import time
-    time.sleep(30)
+    time.sleep(5)
 
     try:
         classification_store = classify_all_reviews(
