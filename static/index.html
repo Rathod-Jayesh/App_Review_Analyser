@@ -66,7 +66,7 @@
           </div>
         </div>
         <div class="flex gap-1 bg-gray-100 p-1 rounded-xl">
-          <template x-for="[id, label] in [['dashboard','Dashboard'],['pulse','Weekly Pulse']]">
+          <template x-for="[id, label] in [['dashboard','Dashboard'],['pulse','Weekly Review']]">
             <button @click="navigateTo(id)"
                     :class="page === id ? 'bg-white text-gray-900 shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'"
                     class="px-5 py-2 rounded-lg text-sm transition-all duration-200" x-text="label" :aria-label="label" tabindex="0">
@@ -122,7 +122,7 @@
             <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
               <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             </div>
-            <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold">Latest Pulse</p>
+            <p class="text-xs text-gray-400 uppercase tracking-widest font-semibold">Latest Review</p>
           </div>
           <p class="text-lg font-bold text-gray-900" x-text="stats.latestNote || 'None'"></p>
         </div>
@@ -271,7 +271,7 @@
            class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
         <div class="bg-groww-light px-6 py-4 border-b border-groww/10 flex items-center justify-between">
           <div>
-            <h2 class="font-bold text-groww-dark text-base">Weekly Review Pulse</h2>
+            <h2 class="font-bold text-groww-dark text-base">Weekly Review Report</h2>
             <p class="text-xs text-groww-dark/70" x-text="(generatedReport || latestPulse).report_date + ' | ' + ((generatedReport || latestPulse).period || '')"></p>
           </div>
           <div class="flex gap-2 no-print">
@@ -341,9 +341,9 @@
         <div class="lg:col-span-3">
           <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-300">
             <div class="flex items-center justify-between mb-5">
-              <h2 class="font-bold text-gray-900 text-base">Latest Pulse Preview</h2>
+              <h2 class="font-bold text-gray-900 text-base">Latest Review Preview</h2>
               <button x-show="latestPulse" @click="navigateTo('pulse')"
-                      class="text-groww hover:text-groww-dark text-xs font-medium no-print transition-colors" aria-label="View full pulse">
+                      class="text-groww hover:text-groww-dark text-xs font-medium no-print transition-colors" aria-label="View full review">
                 View full &rarr;
               </button>
             </div>
@@ -352,7 +352,7 @@
                 <div class="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <svg class="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 </div>
-                <p class="text-gray-400 text-sm font-medium">No pulse note generated yet</p>
+                <p class="text-gray-400 text-sm font-medium">No review note generated yet</p>
                 <p class="text-gray-300 text-xs mt-1">Click "Run Pipeline" above to get started</p>
               </div>
             </template>
@@ -374,8 +374,8 @@
     <section x-show="page === 'pulse'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
              x-init="$watch('page', v => { if (v === 'pulse') loadPulseList(); })">
       <div class="mb-8">
-        <h1 class="text-2xl font-bold text-gray-900">Weekly Pulse Notes</h1>
-        <p class="text-sm text-gray-500 mt-1">View, download, and email your weekly review pulse.</p>
+        <h1 class="text-2xl font-bold text-gray-900">Weekly Notes</h1>
+        <p class="text-sm text-gray-500 mt-1">View, download, and email your weekly review notes.</p>
       </div>
 
       <div class="grid lg:grid-cols-3 gap-6">
@@ -391,7 +391,7 @@
                 <button @click="loadPulseByDate(date)"
                         :class="latestPulse && latestPulse.report_date === date ? 'bg-groww-light border-groww text-groww-dark' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'"
                         class="w-full text-left px-4 py-3 rounded-xl text-sm border transition-all duration-200 flex items-center gap-3"
-                        :aria-label="'View pulse for ' + date" tabindex="0">
+                        :aria-label="'View note for ' + date" tabindex="0">
                   <svg class="w-4 h-4 flex-shrink-0 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                   <span class="font-medium" x-text="date"></span>
                 </button>
@@ -432,7 +432,7 @@
                 <div class="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
                   <svg class="w-10 h-10 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 </div>
-                <p class="text-sm font-medium">No pulse note selected</p>
+                <p class="text-sm font-medium">No review note selected</p>
                 <p class="text-xs mt-1">Generate one from the Dashboard or select from the list</p>
               </div>
             </template>
