@@ -46,7 +46,7 @@ def send_email(draft: EmailDraft) -> None:
 
 def _send_via_resend(draft: EmailDraft) -> None:
     """Send email via Resend HTTP API — works on all cloud platforms."""
-    sender = "GROWW Review Pulse <onboarding@resend.dev>"
+    sender = "Groww Review Analyser <onboarding@resend.dev>"
     logger.info("Sending via Resend API from %s to %s ...", sender, draft.to)
 
     resp = requests.post(
@@ -127,7 +127,7 @@ def _send_via_smtp(draft: EmailDraft) -> None:
 def _build_mime_message(draft: EmailDraft) -> MIMEMultipart:
     msg = MIMEMultipart("alternative")
     msg["Subject"] = draft.subject
-    msg["From"] = f'"GROWW Review Pulse" <{settings.email_sender or "noreply@groww.in"}>'
+    msg["From"] = f'"Groww Review Analyser" <{settings.email_sender or "noreply@groww.in"}>'
     msg["To"] = draft.to
 
     msg.attach(MIMEText(draft.plain_body, "plain", "utf-8"))
